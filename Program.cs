@@ -5,7 +5,7 @@ using System.Diagnostics;
 
 internal class Program {
     private static readonly string configFilePath = $"{AppDomain.CurrentDomain.FriendlyName}.ini";
-    private static readonly string sectionName = Path.GetFileNameWithoutExtension(Process.GetCurrentProcess().MainModule.FileName);
+    private static readonly string sectionName = Path.GetFileName(Environment.ProcessPath);
     private static FileIniDataParser iniParser = new();
 
     private static string[] AddArguments(string[] args, string[] argumentsToAdd) {
@@ -33,15 +33,15 @@ internal class Program {
 
         return filteredArgs.ToArray();
     }
-    private static IniData GenerateDefaultSection(IniData data, string[] args) {
+    private static IniData GenerateDefaultSection(IniData data, string file, string[] args) {
         data.Sections.AddSection(sectionName);
         data[sectionName].AddKey("remove", string.Join(",", args));
         data[sectionName].AddKey("add", string.Join(",", args));
-        data[sectionName].AddKey("file", args[0]);
+        data[sectionName].AddKey("file", file);
         return data;
     }
 
-    private static void GenerateDefaultConfigFile(string[] args) => WriteToConfigFile(GenerateDefaultSection(new IniData(), args));
+    private static void GenerateDefaultConfigFile(string file, string[] args) => WriteToConfigFile(GenerateDefaultSection(new IniData(), file, args));
     private static void WriteToConfigFile(IniData data) => iniParser.WriteFile(configFilePath, data);
 
     private static void ShowError(string file, string[] args, string message, string title) => MessageBox.Show(
@@ -53,10 +53,11 @@ internal class Program {
 
     private static void Main(string[] args) {
         // split args into file and arguments but make it not error if there are no arguments
-        var file = args[0];
-        args = args.Skip(1).ToArray();
+        // get current running exe name without path but with extension
+        var file = sectionName; // args[0];
+        //args = args.Skip(1).ToArray();
         if (!File.Exists(configFilePath)) {
-            GenerateDefaultConfigFile(args);
+            GenerateDefaultConfigFile(file, args);
             return;
         }
 
@@ -64,7 +65,7 @@ internal class Program {
         IniData data = parser.ReadFile(configFilePath);
 
         if (!data.Sections.ContainsSection(sectionName)) {
-            WriteToConfigFile(GenerateDefaultSection(data, args));
+            WriteToConfigFile(GenerateDefaultSection(data, file, args));
             ShowError(file, args, $"The {sectionName} section was not found in the {configFilePath} file. Please update the file with the appropriate values.", "Config section not found!");
             return;
         }
