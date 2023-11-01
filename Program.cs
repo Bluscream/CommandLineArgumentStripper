@@ -3,10 +3,11 @@ using IniParser.Model;
 using System.Diagnostics;
 using System.Windows.Forms;
 
-class Program {
+internal class Program {
     private const string configFilePath = "config.ini";
     private const string sectionName = "General";
-    static void Main(string[] _args) {
+
+    private static void Main(string[] _args) {
         var selfName = _args[0];
         var args = (_args.Length > 1) ? new string[_args.Length - 1] : new string[] { };
         if (!File.Exists(configFilePath)) {
@@ -32,7 +33,7 @@ class Program {
         CallOtherFile(fileName, finalArgs);
     }
 
-    static void GenerateDefaultConfigFile(string filePath, string[] args) {
+    private static void GenerateDefaultConfigFile(string filePath, string[] args) {
         IniData data = new IniData();
         data.Sections.AddSection(sectionName);
         data[sectionName].AddKey("remove", string.Join(",", args));
@@ -43,7 +44,7 @@ class Program {
         parser.WriteFile(filePath, data);
     }
 
-    static string[] FilterArguments(string[] args, string[] argumentsToRemove) {
+    private static string[] FilterArguments(string[] args, string[] argumentsToRemove) {
         var filteredArgs = new List<string>();
 
         foreach (var arg in args) {
@@ -55,13 +56,13 @@ class Program {
         return filteredArgs.ToArray();
     }
 
-    static string[] AddArguments(string[] args, string[] argumentsToAdd) {
+    private static string[] AddArguments(string[] args, string[] argumentsToAdd) {
         var finalArgs = new List<string>(args);
         finalArgs.AddRange(argumentsToAdd);
         return finalArgs.ToArray();
     }
 
-    static void CallOtherFile(string fileName, string[] args) {
+    private static void CallOtherFile(string fileName, string[] args) {
         // Build the arguments string
         string arguments = string.Join(" ", args);
 
