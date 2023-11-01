@@ -1,38 +1,47 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
+using System.Windows.Forms;
+using IniParser;
+using IniParser.Model;
 
 class Program {
-    static void Main(string[] args) {
-        // Read the arguments to remove and the file name from the config file
-        string[] argumentsToRemove = ReadArgumentsToRemoveFromFile(out string fileName);
+    private const string configFilePath = "config.ini";
+    private const string sectionName = "General";
+    static void Main(string[] _args) {
+        var selfName = _args[0];
+        var args = (_args.Length > 1) ? new string[_args.Length - 1] : new string[] { };
+        if (!File.Exists(configFilePath)) {
+            GenerateDefaultConfigFile(configFilePath, args);
+            MessageBox.Show($"A default config.ini file has been generated. Please update the file with the appropriate values.\n\n{selfName}\n{string.Join('\n', args)}", "Config file not found!", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        var parser = new FileIniDataParser();
+        IniData data = parser.ReadFile(configFilePath);
+
+        string[] argumentsToRemove = data[sectionName]["remove"].Split(',');
+        string[] argumentsToAdd = data[sectionName]["add"].Split(',');
+        string fileName = data[sectionName]["file"];
 
         // Remove the arguments to be excluded
         var filteredArgs = FilterArguments(args, argumentsToRemove);
 
-        // Call the other file with the remaining arguments
-        CallOtherFile(fileName, filteredArgs);
+        // Add the arguments to be included
+        var finalArgs = AddArguments(filteredArgs, argumentsToAdd);
+
+        // Call the other file with the final arguments
+        CallOtherFile(fileName, finalArgs);
     }
 
-    static string[] ReadArgumentsToRemoveFromFile(out string fileName) {
-        string configFileName = $"{AppDomain.CurrentDomain.FriendlyName}.cfg";
-        List<string> argumentsToRemove = new List<string>();
-        fileName = "";
+    static void GenerateDefaultConfigFile(string filePath, string[] args) {
+        IniData data = new IniData();
+        data.Sections.AddSection(sectionName);
+        data[sectionName].AddKey("remove", string.Join(",", args));
+        data[sectionName].AddKey("add", string.Join(",", args));
+        data[sectionName].AddKey("file", args[0]);
 
-        if (File.Exists(configFileName)) {
-            string[] lines = File.ReadAllLines(configFileName);
-            foreach (var line in lines) {
-                if (line.StartsWith("argumentsToRemove=")) {
-                    string[] arguments = line.Substring("argumentsToRemove=".Length).Split(',');
-                    argumentsToRemove.AddRange(arguments);
-                } else if (line.StartsWith("fileName=")) {
-                    fileName = line.Substring("fileName=".Length);
-                }
-            }
-        }
-
-        return argumentsToRemove.ToArray();
+        var parser = new FileIniDataParser();
+        parser.WriteFile(filePath, data);
     }
 
     static string[] FilterArguments(string[] args, string[] argumentsToRemove) {
@@ -45,6 +54,12 @@ class Program {
         }
 
         return filteredArgs.ToArray();
+    }
+
+    static string[] AddArguments(string[] args, string[] argumentsToAdd) {
+        var finalArgs = new List<string>(args);
+        finalArgs.AddRange(argumentsToAdd);
+        return finalArgs.ToArray();
     }
 
     static void CallOtherFile(string fileName, string[] args) {
