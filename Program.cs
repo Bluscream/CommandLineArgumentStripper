@@ -1,7 +1,6 @@
 ﻿using IniParser;
 using IniParser.Model;
 using System.Diagnostics;
-using System.Windows.Forms;
 
 internal class Program {
     private const string configFilePath = "config.ini";
