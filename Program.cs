@@ -5,23 +5,31 @@ using System.IO;
 
 class Program {
     static void Main(string[] args) {
-        // Read the arguments to remove from the config file
-        string[] argumentsToRemove = ReadArgumentsToRemoveFromFile();
+        // Read the arguments to remove and the file name from the config file
+        string[] argumentsToRemove = ReadArgumentsToRemoveFromFile(out string fileName);
 
         // Remove the arguments to be excluded
         var filteredArgs = FilterArguments(args, argumentsToRemove);
 
         // Call the other file with the remaining arguments
-        CallOtherFile(filteredArgs);
+        CallOtherFile(fileName, filteredArgs);
     }
 
-    static string[] ReadArgumentsToRemoveFromFile() {
+    static string[] ReadArgumentsToRemoveFromFile(out string fileName) {
         string configFileName = $"{AppDomain.CurrentDomain.FriendlyName}.cfg";
         List<string> argumentsToRemove = new List<string>();
+        fileName = "";
 
         if (File.Exists(configFileName)) {
             string[] lines = File.ReadAllLines(configFileName);
-            argumentsToRemove.AddRange(lines);
+            foreach (var line in lines) {
+                if (line.StartsWith("argumentsToRemove=")) {
+                    string[] arguments = line.Substring("argumentsToRemove=".Length).Split(',');
+                    argumentsToRemove.AddRange(arguments);
+                } else if (line.StartsWith("fileName=")) {
+                    fileName = line.Substring("fileName=".Length);
+                }
+            }
         }
 
         return argumentsToRemove.ToArray();
@@ -39,10 +47,7 @@ class Program {
         return filteredArgs.ToArray();
     }
 
-    static void CallOtherFile(string[] args) {
-        // Replace "mysqld" with the actual file name and path
-        string fileName = "mysqld";
-
+    static void CallOtherFile(string fileName, string[] args) {
         // Build the arguments string
         string arguments = string.Join(" ", args);
 
