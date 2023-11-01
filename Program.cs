@@ -7,6 +7,43 @@ internal class Program {
     private const string configFilePath = "config.ini";
     private const string sectionName = "General";
 
+    private static string[] AddArguments(string[] args, string[] argumentsToAdd) {
+        var finalArgs = new List<string>(args);
+        finalArgs.AddRange(argumentsToAdd);
+        return finalArgs.ToArray();
+    }
+
+    private static void CallOtherFile(string fileName, string[] args) {
+        // Build the arguments string
+        string arguments = string.Join(" ", args);
+
+        // Start the process
+        Process.Start(fileName, arguments);
+    }
+
+    private static string[] FilterArguments(string[] args, string[] argumentsToRemove) {
+        var filteredArgs = new List<string>();
+
+        foreach (var arg in args) {
+            if (!argumentsToRemove.Contains(arg)) {
+                filteredArgs.Add(arg);
+            }
+        }
+
+        return filteredArgs.ToArray();
+    }
+
+    private static void GenerateDefaultConfigFile(string filePath, string[] args) {
+        IniData data = new IniData();
+        data.Sections.AddSection(sectionName);
+        data[sectionName].AddKey("remove", string.Join(",", args));
+        data[sectionName].AddKey("add", string.Join(",", args));
+        data[sectionName].AddKey("file", args[0]);
+
+        var parser = new FileIniDataParser();
+        parser.WriteFile(filePath, data);
+    }
+
     private static void Main(string[] _args) {
         var selfName = _args[0];
         var args = (_args.Length > 1) ? new string[_args.Length - 1] : new string[] { };
@@ -31,42 +68,5 @@ internal class Program {
 
         // Call the other file with the final arguments
         CallOtherFile(fileName, finalArgs);
-    }
-
-    private static void GenerateDefaultConfigFile(string filePath, string[] args) {
-        IniData data = new IniData();
-        data.Sections.AddSection(sectionName);
-        data[sectionName].AddKey("remove", string.Join(",", args));
-        data[sectionName].AddKey("add", string.Join(",", args));
-        data[sectionName].AddKey("file", args[0]);
-
-        var parser = new FileIniDataParser();
-        parser.WriteFile(filePath, data);
-    }
-
-    private static string[] FilterArguments(string[] args, string[] argumentsToRemove) {
-        var filteredArgs = new List<string>();
-
-        foreach (var arg in args) {
-            if (!argumentsToRemove.Contains(arg)) {
-                filteredArgs.Add(arg);
-            }
-        }
-
-        return filteredArgs.ToArray();
-    }
-
-    private static string[] AddArguments(string[] args, string[] argumentsToAdd) {
-        var finalArgs = new List<string>(args);
-        finalArgs.AddRange(argumentsToAdd);
-        return finalArgs.ToArray();
-    }
-
-    private static void CallOtherFile(string fileName, string[] args) {
-        // Build the arguments string
-        string arguments = string.Join(" ", args);
-
-        // Start the process
-        Process.Start(fileName, arguments);
     }
 }
