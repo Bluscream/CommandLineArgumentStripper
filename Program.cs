@@ -1,6 +1,5 @@
 ﻿using IniParser;
 using IniParser.Model;
-using IniParser.Parser;
 using System.Diagnostics;
 
 internal class Program {
@@ -33,6 +32,8 @@ internal class Program {
 
         return filteredArgs.ToArray();
     }
+    private static void GenerateDefaultConfigFile(string[] args) => WriteToConfigFile(GenerateDefaultSection(new IniData(), args));
+
     private static IniData GenerateDefaultSection(IniData data, string[] args) {
         data.Sections.AddSection(sectionName);
         data[sectionName].AddKey("remove", string.Join(",", args));
@@ -40,17 +41,6 @@ internal class Program {
         data[sectionName].AddKey("file", sectionName);
         return data;
     }
-
-    private static void GenerateDefaultConfigFile(string[] args) => WriteToConfigFile(GenerateDefaultSection(new IniData(), args));
-    private static void WriteToConfigFile(IniData data) => iniParser.WriteFile(configFilePath, data);
-
-    private static void ShowError(string[] args, string message, string title) => MessageBox.Show(
-               $"{message}\n\n{sectionName}\n{string.Join('\n', args)}",
-                      title,
-                             MessageBoxButtons.OK,
-                                    MessageBoxIcon.Error
-           );
-
     private static void Main(string[] args) {
         // split args into file and arguments but make it not error if there are no arguments
         // get current running exe name without path but with extension
@@ -85,4 +75,13 @@ internal class Program {
         // Call the other file with the final arguments
         CallOtherFile(fileName, args);
     }
+
+    private static void ShowError(string[] args, string message, string title) => MessageBox.Show(
+               $"{message}\n\n{sectionName}\n{string.Join('\n', args)}",
+                      title,
+                             MessageBoxButtons.OK,
+                                    MessageBoxIcon.Error
+           );
+
+    private static void WriteToConfigFile(IniData data) => iniParser.WriteFile(configFilePath, data);
 }
