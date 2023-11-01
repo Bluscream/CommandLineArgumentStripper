@@ -1,10 +1,12 @@
 ﻿using IniParser;
 using IniParser.Model;
+using IniParser.Parser;
 using System.Diagnostics;
 
 internal class Program {
-    private const string configFilePath = "config.ini";
-    private const string sectionName = "General";
+    private static readonly string configFilePath = $"{AppDomain.CurrentDomain.FriendlyName}.ini";
+    private static readonly string sectionName = Path.GetFileNameWithoutExtension(Process.GetCurrentProcess().MainModule.FileName);
+    private static FileIniDataParser iniParser = new();
 
     private static string[] AddArguments(string[] args, string[] argumentsToAdd) {
         var finalArgs = new List<string>(args);
@@ -31,41 +33,56 @@ internal class Program {
 
         return filteredArgs.ToArray();
     }
-
-    private static void GenerateDefaultConfigFile(string filePath, string[] args) {
-        IniData data = new IniData();
+    private static IniData GenerateDefaultSection(IniData data, string[] args) {
         data.Sections.AddSection(sectionName);
         data[sectionName].AddKey("remove", string.Join(",", args));
         data[sectionName].AddKey("add", string.Join(",", args));
         data[sectionName].AddKey("file", args[0]);
-
-        var parser = new FileIniDataParser();
-        parser.WriteFile(filePath, data);
+        return data;
     }
 
-    private static void Main(string[] _args) {
-        var selfName = _args[0];
-        var args = (_args.Length > 1) ? new string[_args.Length - 1] : new string[] { };
+    private static void GenerateDefaultConfigFile(string[] args) => WriteToConfigFile(GenerateDefaultSection(new IniData(), args));
+    private static void WriteToConfigFile(IniData data) => iniParser.WriteFile(configFilePath, data);
+
+    private static void ShowError(string file, string[] args, string message, string title) => MessageBox.Show(
+               $"{message}\n\n{file}\n{string.Join('\n', args)}",
+                      title,
+                             MessageBoxButtons.OK,
+                                    MessageBoxIcon.Error
+           );
+
+    private static void Main(string[] args) {
+        // split args into file and arguments but make it not error if there are no arguments
+        var file = args[0];
+        args = args.Skip(1).ToArray();
         if (!File.Exists(configFilePath)) {
-            GenerateDefaultConfigFile(configFilePath, args);
-            MessageBox.Show($"A default config.ini file has been generated. Please update the file with the appropriate values.\n\n{selfName}\n{string.Join('\n', args)}", "Config file not found!", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            GenerateDefaultConfigFile(args);
             return;
         }
 
         var parser = new FileIniDataParser();
         IniData data = parser.ReadFile(configFilePath);
 
-        string[] argumentsToRemove = data[sectionName]["remove"].Split(',');
-        string[] argumentsToAdd = data[sectionName]["add"].Split(',');
+        if (!data.Sections.ContainsSection(sectionName)) {
+            WriteToConfigFile(GenerateDefaultSection(data, args));
+            ShowError(file, args, $"The {sectionName} section was not found in the {configFilePath} file. Please update the file with the appropriate values.", "Config section not found!");
+            return;
+        }
         string fileName = data[sectionName]["file"];
 
         // Remove the arguments to be excluded
-        var filteredArgs = FilterArguments(args, argumentsToRemove);
+        if (data[sectionName].ContainsKey("remove")) {
+            string[] argumentsToRemove = data[sectionName]["remove"].Split(',');
+            args = FilterArguments(args, argumentsToRemove);
+        }
 
         // Add the arguments to be included
-        var finalArgs = AddArguments(filteredArgs, argumentsToAdd);
+        if (data[sectionName].ContainsKey("add")) {
+            string[] argumentsToAdd = data[sectionName]["add"].Split(',');
+            args = AddArguments(args, argumentsToAdd);
+        }
 
         // Call the other file with the final arguments
-        CallOtherFile(fileName, finalArgs);
+        CallOtherFile(fileName, args);
     }
 }
