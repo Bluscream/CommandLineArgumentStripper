@@ -1,11 +1,13 @@
 ﻿using IniParser;
 using IniParser.Model;
+using System;
 using System.Diagnostics;
 
 internal class Program {
     private static readonly string configFilePath = $"{AppDomain.CurrentDomain.FriendlyName}.ini";
     private static readonly string sectionName = Path.GetFileName(Environment.ProcessPath);
     private static FileIniDataParser iniParser = new();
+    private static Process proxiedProcess;
 
     private static string[] AddArguments(string[] args, string[] argumentsToAdd) {
         var finalArgs = new List<string>(args);
@@ -13,23 +15,39 @@ internal class Program {
         return finalArgs.ToArray();
     }
 
-    private static void CallOtherFile(string fileName, string[] args) {
-        // Build the arguments string
+    private static void RunOtherFile(string fileName, string[] args) {
+        string arguments = string.Join(" ", args);
+        Process.Start(fileName, arguments);
+    }
+
+    private static void ProxyOtherFile(string fileName, string[] args) {
         string arguments = string.Join(" ", args);
 
-        // Start the process
-        Process.Start(fileName, arguments);
+        proxiedProcess = new Process();
+        proxiedProcess.StartInfo = new() {
+            FileName = fileName,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        proxiedProcess.OutputDataReceived += (sender, e) => Console.WriteLine(e.Data);
+        proxiedProcess.ErrorDataReceived += (sender, e) => Console.WriteLine(e.Data);
+        proxiedProcess.Exited += (sender, e) => CloseCurrentProcess();
+        proxiedProcess.Start();
+        proxiedProcess.BeginOutputReadLine();
+        proxiedProcess.BeginErrorReadLine();
+        proxiedProcess.WaitForExit();
     }
 
     private static string[] FilterArguments(string[] args, string[] argumentsToRemove) {
         var filteredArgs = new List<string>();
-
         foreach (var arg in args) {
             if (!argumentsToRemove.Contains(arg)) {
                 filteredArgs.Add(arg);
             }
         }
-
         return filteredArgs.ToArray();
     }
     private static void GenerateDefaultConfigFile(string[] args) => WriteToConfigFile(GenerateDefaultSection(new IniData(), args));
@@ -42,46 +60,40 @@ internal class Program {
         return data;
     }
     private static void Main(string[] args) {
-        // split args into file and arguments but make it not error if there are no arguments
-        // get current running exe name without path but with extension
-        //args = args.Skip(1).ToArray();
         if (!File.Exists(configFilePath)) {
             GenerateDefaultConfigFile(args);
             return;
         }
-
         var parser = new FileIniDataParser();
         IniData data = parser.ReadFile(configFilePath);
-
         if (!data.Sections.ContainsSection(sectionName)) {
             WriteToConfigFile(GenerateDefaultSection(data, args));
             ShowError(args, $"The {sectionName} section was not found in the {configFilePath} file. Please update the file with the appropriate values.", "Config section not found!");
             return;
         }
         string fileName = data[sectionName]["file"];
-
-        // Remove the arguments to be excluded
         if (data[sectionName].ContainsKey("remove")) {
             string[] argumentsToRemove = data[sectionName]["remove"].Split(',');
             args = FilterArguments(args, argumentsToRemove);
         }
-
-        // Add the arguments to be included
         if (data[sectionName].ContainsKey("add")) {
             string[] argumentsToAdd = data[sectionName]["add"].Split(',');
             args = AddArguments(args, argumentsToAdd);
         }
-
-        // Call the other file with the final arguments
-        CallOtherFile(fileName, args);
+        AppDomain.CurrentDomain.ProcessExit += (sender, e) => CloseCurrentProcess();
+        ProxyOtherFile(fileName, args);
     }
 
     private static void ShowError(string[] args, string message, string title) => MessageBox.Show(
-               $"{message}\n\n{sectionName}\n{string.Join('\n', args)}",
-                      title,
-                             MessageBoxButtons.OK,
-                                    MessageBoxIcon.Error
-           );
+        $"{message}\n\n{sectionName}\n{string.Join('\n', args)}", title, MessageBoxButtons.OK, MessageBoxIcon.Error);
 
     private static void WriteToConfigFile(IniData data) => iniParser.WriteFile(configFilePath, data);
+
+    private static void CloseCurrentProcess() {
+        if (proxiedProcess != null) {
+            if (!proxiedProcess.HasExited) proxiedProcess.Kill();
+            Process.GetProcessesByName(proxiedProcess.StartInfo.FileName).ToList().ForEach(p => p.Kill());
+        }
+        Environment.Exit(0);
+    }
 }
